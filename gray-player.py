@@ -18,9 +18,10 @@ in order to have a good 'flow'. Guess I can start with the thread classes. DONE
         - Make appropriate classes for the three functions. DONE
         - Setup args for this program. DONE
         - Setup help dialog. DONE
-        - Rewatch the semaphore material. DONE
-        - Try to implement with Queue w/ threadsafe for now
         - Add debug switch DONE
+        - Read more on semaphores from book
+        - Try to implement with Queue w/ threadsafe for now
+        - Ask David Pruitt about queueing jpg data vs jpg files.
 '''
 import argparse, base64, cv2, os, queue, sys, threading
 
@@ -39,19 +40,32 @@ q = queue.Queue(24) # Easy queue for testing. Capacity @ 24.
 
 def main():
     zone = 'GP>main>'
-    if d: print(zone)
-    pass
+    if d: print('%s started...' % zone)
+    # Create all the threads
+    if d: print('%s initiating Frame Extractor, Gray Scaler, & VideoDisplayer...' % zone)
+    frame_extractor = FrameExtractor()
+    gray_scaler = GrayScaler()
+    video_displayer = VideoDisplayer()
+    if d: print('%s finished initializing.' % zone)
+    if d: print('%s starting threads...' % zone)
+    frame_extractor.start()
+    gray_scaler.start()
+    video_displayer.start()
+    if d: print('%s threads are running.' % zone)
+    if d: print('%s done.' % zone)
 
 
 class FrameExtractor (threading.Thread):
 
     def __init__(self):
-        zone = 'FM>init>'
+        zone = '\tFM>init>'
         threading.Thread.__init__(self, name='FrameExtractor')
+        if d: print('%s initiated.' % zone)
         pass
 
     def run(self):
         zone = 'FM>run>'
+        if d: 
         video_cap = cv2.VideoCapture(args.filename) #Open file
         success,image = video_cap.read() #Take one image from file.
         while success:
@@ -60,26 +74,28 @@ class FrameExtractor (threading.Thread):
             #TODO What do we put into the queue. How can Grayscaler convert data
             success, image = video_cap.read()
     
-class Grayscaler (threading.Thread):
+class GrayScaler (threading.Thread):
 
     def __init__(self):
-        zone = 'GS>init>'
+        zone = '\tGS>init>'
         threading.Thread.__init__(self, name='Grayscaler')
+        if d: print('%s initiated.' % zone)
         pass
     
     def run(self):
-        zone = 'GS>run>'
+        zone = '\t\tGS>run>'
         pass
     
 class VideoDisplayer (threading.Thread):
 
     def __init__(self):
-        zone = 'VD>init>'
+        zone = '\tVD>init>'
         threading.Thread.__init__(self, name='VideoDisplayer')
+        if d: print('%s initiated.' % zone)
         pass
     
     def run(self):
-        zone = 'VD>run>'
+        zone = '\t\tVD>run>'
         pass
 
 main()
