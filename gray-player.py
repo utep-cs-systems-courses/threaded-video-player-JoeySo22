@@ -19,9 +19,23 @@ in order to have a good 'flow'. Guess I can start with the thread classes. DONE
         - Setup args for this program. DONE
         - Setup help dialog. DONE
         - Add debug switch DONE
-        - Read more on semaphores from book
-        - Try to implement with Queue w/ threadsafe for now
-        - Ask David Pruitt about queueing jpg data vs jpg files.
+        - Read more on semaphores from book DONE
+        - Try to implement with Queue w/ threadsafe for now TBC
+        - Ask David Pruitt about queueing jpg data vs jpg files. DONE
+
+    10/27/2020 11:56PM - After talking with David about the question on the jpeg 
+objects and files, I've learned what the code is doing in the examples. ExtractFrames.py
+basically just gets some image data when reading. Although it was named jpeg, its just 
+data.
+        - Check on frame extractor and implement its job. DONE
+        - Implement for GrayScaler & VideoDisplayer
+    I just realized that the cv2.read() method returns a boolean value to signify the
+end of the reading. I need a way for the threads to flag globally that their job is done
+and should stop waiting for the pipe to feed more to the queue. So two things should be
+asserted before a thread is done. The previous thread is done and the queue is empty.
+        - Implement the above. DONE
+    10/28/2020 3:03AM - I have a bug where the Frame Extractor is filling up the q1 but the Gray Scaler is
+already done. Need to fix that.
 '''
 import argparse, base64, cv2, os, queue, sys, threading
 
@@ -36,13 +50,20 @@ arg_parse.add_argument('-d', '--debug', help='Enables debugging output.',
 args = arg_parse.parse_args() # This will get the arguments from the command line.
 d = args.debug # Easier namespace. Used for debugging.
 
-q = queue.Queue(24) # Easy queue for testing. Capacity @ 24.
+global q1, q2
+#Removed video_displayer_complete because it isn't used.
+global frame_extractor_complete, gray_scaler_complete
 
 def main():
+    global q1, q2, frame_extracter_complete, gray_scaler_complete
     zone = 'GP>main>'
     if d: print('%s started...' % zone)
+    q1 = queue.Queue(24) # Easy queue for testing. Capacity @ 24.
+    q2 = queue.Queue(24) # ||    ||   ||     ||        ||
+    frame_extractor_complete = False
+    gray_scaler_complete = False
     # Create all the threads
-    if d: print('%s initiating Frame Extractor, Gray Scaler, & VideoDisplayer...' % zone)
+    if d: print('%s initiating Frame Extractor, Gray Scaler, & Video Displayer...' % zone)
     frame_extractor = FrameExtractor()
     gray_scaler = GrayScaler()
     video_displayer = VideoDisplayer()
@@ -58,22 +79,27 @@ def main():
 class FrameExtractor (threading.Thread):
 
     def __init__(self):
-        zone = '\tFM>init>'
+        zone = '\tFE>init>'
         threading.Thread.__init__(self, name='FrameExtractor')
+        self.counter = 0
         if d: print('%s initiated.' % zone)
         pass
 
     def run(self):
-        zone = 'FM>run>'
-        if d: 
+        global q1, frame_extractor_complete
+        zone = '\t\tFE>run>'
+        if d: print('%s running' % zone)
         video_cap = cv2.VideoCapture(args.filename) #Open file
         success,image = video_cap.read() #Take one image from file.
         while success:
-            success, jpg = cv2.imencode('.jpg', image) #Encode to a jpeg format
-            jpg_text = base64.b64encode(jpg) #Turn jpg data to encoded text
-            #TODO What do we put into the queue. How can Grayscaler convert data
-            success, image = video_cap.read()
-    
+            self.counter += 1
+            q1.put(image) # Just stuff it into the queue
+            if d: print('%s frame: %d' % (zone, self.counter))
+            success, image = video_cap.read() # Redo it again.
+        frame_extractor_complete = True # Flag that this thread is finished.
+        if d: print('%s done.' % zone)
+
+        
 class GrayScaler (threading.Thread):
 
     def __init__(self):
@@ -83,9 +109,24 @@ class GrayScaler (threading.Thread):
         pass
     
     def run(self):
+        global q1, q2, frame_extractor_complete, gray_scaler_complete
         zone = '\t\tGS>run>'
-        pass
-    
+        if d: print('%s running' % zone)
+        while not q1.empty() and not frame_extractor_complete:
+            '''
+            I'm afraid that this process will take up a lot of memory. So I will shorten
+            the expression by stuffing the function calls inside of each other rather
+            than being explicit.
+        
+            frame = q1.get()
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            q2.put(gray_frame)
+            '''
+            q2.put(cv2.cvtColor(q1.get(), cv2.COLOR_BGR2GRAY))
+        gray_scaler_complete = True # Flag that this thread is finished.
+        if d: print('%s done.' % zone)
+
+        
 class VideoDisplayer (threading.Thread):
 
     def __init__(self):
@@ -95,7 +136,11 @@ class VideoDisplayer (threading.Thread):
         pass
     
     def run(self):
+        global q2, gray_scaler_complete
         zone = '\t\tVD>run>'
-        pass
+        if d: print('%s running' % zone)
+        while not gray_scaler_complete and not q2.empty():
+            cv2.imshow('Video', q2.get())
+        if d: print('%s done.' % zone)
 
 main()
