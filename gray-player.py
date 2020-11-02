@@ -54,8 +54,6 @@ args = arg_parse.parse_args() # This will get the arguments from the command lin
 d = args.debug # Easier namespace. Used for debugging.
 
 global q1, q2
-q1 = queue.Queue(10)
-q2 = queue.Queue(10)
 #Removed video_displayer_complete because it isn't used.
 global frame_extractor_complete, gray_scaler_complete
 frame_extractor_complete = False
@@ -162,16 +160,27 @@ class VideoDisplayer (threading.Thread):
         cv2.destroyAllWindows()
         if d: print('%s done.' % zone)
 
-'''
-class ThreadSafeQueue:
+
+class TSQueue:
 
     def __init__(self, size):
         self.size = size
+        self.list = []
+        self.full = threading.Semaphore(0)
+        self.empty = threading.Semaphore(size)
+        self.lock = threading.Lock()
 
-    def get():
+    def get(self):
+        self.full.acquire()
+        element = list.pop()
+        self.empty.release()
+        return element
         
-        
-    def put(element):
-'''        
+    def put(self, element):
+        self.empty.acquire()
+        self.list.append(element)
+        self.full.release()
 
+q1 = TSQueue(24)
+q2 = TSQueue(24)
 main()
