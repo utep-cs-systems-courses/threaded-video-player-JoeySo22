@@ -36,6 +36,9 @@ asserted before a thread is done. The previous thread is done and the queue is e
         - Implement the above. DONE
     10/28/2020 3:03AM - I have a bug where the Frame Extractor is filling up the q1 but the Gray Scaler is
 already done. Need to fix that.
+
+    11/1/2020 8:22PM - Working on debugging the queue's. Something appears to be off. Can't tell what it
+is yet.
 '''
 import argparse, base64, cv2, os, queue, sys, threading
 
@@ -51,8 +54,8 @@ args = arg_parse.parse_args() # This will get the arguments from the command lin
 d = args.debug # Easier namespace. Used for debugging.
 
 global q1, q2
-q1 = queue.Queue(24)
-q2 = queue.Queue(24)
+q1 = queue.Queue(10)
+q2 = queue.Queue(10)
 #Removed video_displayer_complete because it isn't used.
 global frame_extractor_complete, gray_scaler_complete
 frame_extractor_complete = False
@@ -111,7 +114,6 @@ class GrayScaler (threading.Thread):
         global q1, q2, frame_extractor_complete, gray_scaler_complete
         zone = '\t\tGS>run>'
         if d: print('%s running' % zone)
-        if d: print()
         while not frame_extractor_complete:
             '''
             I'm afraid that this process will take up a lot of memory. So I will shorten
@@ -150,11 +152,26 @@ class VideoDisplayer (threading.Thread):
             if not q2.empty():
                 cv2.imshow('Video', q2.get())
                 self.counter += 1
-                if d: print('%s frame: %d' % (zone, self.counter))
+                if d: print('%sMAIN frame: %d' % (zone, self.counter))
+                cv2.waitKey(42)
         while not q2.empty():
             cv2.imshow('Video', q2.get())
             self.counter += 1
             if d: print('%s frame: %d' % (zone, self.counter))
+            cv2.waitKey(42)
+        cv2.destroyAllWindows()
         if d: print('%s done.' % zone)
+
+'''
+class ThreadSafeQueue:
+
+    def __init__(self, size):
+        self.size = size
+
+    def get():
+        
+        
+    def put(element):
+'''        
 
 main()
