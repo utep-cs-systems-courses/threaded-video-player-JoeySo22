@@ -51,17 +51,17 @@ args = arg_parse.parse_args() # This will get the arguments from the command lin
 d = args.debug # Easier namespace. Used for debugging.
 
 global q1, q2
+q1 = queue.Queue(24)
+q2 = queue.Queue(24)
 #Removed video_displayer_complete because it isn't used.
 global frame_extractor_complete, gray_scaler_complete
+frame_extractor_complete = False
+gray_scaler_complete = False
 
 def main():
     global q1, q2, frame_extracter_complete, gray_scaler_complete
     zone = 'GP>main>'
     if d: print('%s started...' % zone)
-    q1 = queue.Queue(24) # Easy queue for testing. Capacity @ 24.
-    q2 = queue.Queue(24) # ||    ||   ||     ||        ||
-    frame_extractor_complete = False
-    gray_scaler_complete = False
     # Create all the threads
     if d: print('%s initiating Frame Extractor, Gray Scaler, & Video Displayer...' % zone)
     frame_extractor = FrameExtractor()
@@ -83,7 +83,6 @@ class FrameExtractor (threading.Thread):
         threading.Thread.__init__(self, name='FrameExtractor')
         self.counter = 0
         if d: print('%s initiated.' % zone)
-        pass
 
     def run(self):
         global q1, frame_extractor_complete
@@ -105,14 +104,15 @@ class GrayScaler (threading.Thread):
     def __init__(self):
         zone = '\tGS>init>'
         threading.Thread.__init__(self, name='Grayscaler')
+        self.counter = 0
         if d: print('%s initiated.' % zone)
-        pass
     
     def run(self):
         global q1, q2, frame_extractor_complete, gray_scaler_complete
         zone = '\t\tGS>run>'
         if d: print('%s running' % zone)
-        while not q1.empty() and not frame_extractor_complete:
+        if d: print()
+        while not frame_extractor_complete:
             '''
             I'm afraid that this process will take up a lot of memory. So I will shorten
             the expression by stuffing the function calls inside of each other rather
@@ -122,7 +122,14 @@ class GrayScaler (threading.Thread):
             gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             q2.put(gray_frame)
             '''
+            if not q1.empty():
+                q2.put(cv2.cvtColor(q1.get(), cv2.COLOR_BGR2GRAY))
+                self.counter += 1
+                if d: print('%s frame: %d' % (zone, self.counter))
+        while not q1.empty():
             q2.put(cv2.cvtColor(q1.get(), cv2.COLOR_BGR2GRAY))
+            self.counter += 1
+            if d: print('%s frame: %d' % (zone, self.counter))
         gray_scaler_complete = True # Flag that this thread is finished.
         if d: print('%s done.' % zone)
 
@@ -132,15 +139,22 @@ class VideoDisplayer (threading.Thread):
     def __init__(self):
         zone = '\tVD>init>'
         threading.Thread.__init__(self, name='VideoDisplayer')
+        self.counter = 0
         if d: print('%s initiated.' % zone)
-        pass
     
     def run(self):
         global q2, gray_scaler_complete
         zone = '\t\tVD>run>'
         if d: print('%s running' % zone)
-        while not gray_scaler_complete and not q2.empty():
+        while not gray_scaler_complete:
+            if not q2.empty():
+                cv2.imshow('Video', q2.get())
+                self.counter += 1
+                if d: print('%s frame: %d' % (zone, self.counter))
+        while not q2.empty():
             cv2.imshow('Video', q2.get())
+            self.counter += 1
+            if d: print('%s frame: %d' % (zone, self.counter))
         if d: print('%s done.' % zone)
 
 main()
