@@ -122,11 +122,11 @@ class GrayScaler (threading.Thread):
             gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             q2.put(gray_frame)
             '''
-            if not q1.is_empty():
+            if not q1.empty():
                 q2.put(cv2.cvtColor(q1.get(), cv2.COLOR_BGR2GRAY))
                 self.counter += 1
                 if d: print('%s frame: %d' % (zone, self.counter))
-        while not q1.is_empty():
+        while not q1.empty():
             q2.put(cv2.cvtColor(q1.get(), cv2.COLOR_BGR2GRAY))
             self.counter += 1
             if d: print('%s frame: %d' % (zone, self.counter))
@@ -147,12 +147,12 @@ class VideoDisplayer (threading.Thread):
         zone = '\t\tVD>run>'
         if d: print('%s running' % zone)
         while not gray_scaler_complete:
-            if not q2.is_empty():
+            if not q2.empty():
                 cv2.imshow('Video', q2.get())
                 self.counter += 1
                 if d: print('%sMAIN frame: %d' % (zone, self.counter))
                 cv2.waitKey(42)
-        while not q2.is_empty():
+        while not q2.empty():
             cv2.imshow('Video', q2.get())
             self.counter += 1
             if d: print('%s frame: %d' % (zone, self.counter))
@@ -167,46 +167,50 @@ class TSQueue:
         self.zone = '\tTSQ>'
         self.l = []
         self.full = threading.Semaphore(0)
-        self.empty = threading.Semaphore(size)
+        self.is_empty = threading.Semaphore(size)
         self.lock = threading.Lock()
 
     def get(self):
-        if d: print('%s>get> called.' % self.zone)
-        self.lock.acquire()
         if d: print('%sget> acquired lock' % self.zone)
         self.full.acquire()
+        if d: print('%sget> called.' % self.zone)
+        self.lock.acquire()
         if d: print('%sget> semaphore acquired' % self.zone)
         element = self.l.pop(0)
         if d: print('%sget> pop called.' % self.zone)
-        self.empty.release()
-        if d: print('%sget> semaphore released.' % self.zone)
         self.lock.release()
         if d: print('%sget> lock released.' % self.zone)
+        self.is_empty.release()
+        if d: print('%sget> semaphore released.' % self.zone)
         return element
         
     def put(self, element):
-        if d: print('%s>put> called.' % self.zone)
-        self.lock.acquire()
         if d: print('%sput> acquired lock' % self.zone)
-        self.empty.acquire()
+        self.is_empty.acquire()
+        if d: print('%sput> called.' % self.zone)
+        self.lock.acquire()
         if d: print('%sput> semaphore acquired' % self.zone)
         self.l.append(element)
         if d: print('%sput> appended.' % self.zone)
-        self.full.release()
-        if d: print('%sput> semaphore released.' % self.zone)
         self.lock.release()
         if d: print('%sput> lock released.' % self.zone)
+        self.full.release()
+        if d: print('%sput> semaphore released.' % self.zone)
 
-    def is_empty(self):
-        if d: print('%sis_empty> called.' % self.zone)
+
+    def empty(self):
+        if d: print('%s>is_empty> called.' %self.zone)
         self.lock.acquire()
-        if d: print('%sis_empty> lock acquired.' % self.zone)
-        is_empty = len(self.l) == 0
-        if d: print('%sis_empty> empty checked.' % self.zone)
+        if d: print('%s>is_empty> lock acquired.' %self.zone)
+        _empty = not self.l
         self.lock.release()
-        if d: print('%sis_empty> lock released.' % self.zone)
-        return is_empty
+        if d: print('%s>is_empty> lock released.' %self.zone)
+        return _empty
 
-q1 = TSQueue(24)
-q2 = TSQueue(24)
+q1 = TSQueue(10)
+q2 = TSQueue(10)
+#q1 = queue.Queue(10)
+#q2 = queue.Queue(10)
 main()
+
+#TCP File transfer locking entire ft process, instead of transfer then write, keep a DS of what files are open and lock around it instead.
